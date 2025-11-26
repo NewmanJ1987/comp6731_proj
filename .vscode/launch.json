@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Launch Titanic (implementation.py)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/titanic/implementation.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/titanic",
+      "python": "/Users/n_thurai/.pyenv/versions/project_titanic/bin/python",
+      "args": []
+    },
+        {
+      "name": "Python: Launch Dermatology (implementation.py)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/dermatology/implementation.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/dermatology",
+      "python": "/Users/n_thurai/.pyenv/versions/project_titanic/bin/python",
+      "args": []
+    }
+  ]
+}
