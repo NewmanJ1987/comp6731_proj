@@ -58,13 +58,13 @@ def test_gaussian_similarity_with_broadcasting():
     assert A.shape == (3,3)
     assert B.shape == (2,3)
 
-    guass_sim = A.unsqueeze(1)     # [N,1,D]
+    A1 = A.unsqueeze(1)     # [N,1,D]
     B1 = B.unsqueeze(0)     # [1,C,D]
 
-    assert guass_sim.shape == (3,1,3)
+    assert A1.shape == (3,1,3)
     assert B1.shape == (1,2,3)
-
-    assert torch.equal(guass_sim, torch.tensor([
+    # Setup features for a broadcasted subtraction
+    assert torch.equal(A1, torch.tensor([
         [[
             1,0,0]
         ],
@@ -76,6 +76,7 @@ def test_gaussian_similarity_with_broadcasting():
         ]
     ], dtype=torch.float32))
 
+    # Setup centers for a broadcast subtraction
     assert torch.equal(B1, torch.tensor([
         [
             [1,0,0],
@@ -83,7 +84,7 @@ def test_gaussian_similarity_with_broadcasting():
         ]
     ], dtype=torch.float32))
 
-    diff = guass_sim - B1
+    diff = A1 - B1
     assert diff.shape == (3,2,3)
     assert torch.equal(diff, torch.tensor([
         [
@@ -117,10 +118,10 @@ def test_gaussian_similarity_with_broadcasting():
         ]
     ], dtype=torch.float32))
 
+    # calculate sum of squared differences across feature dimensions
     sum_diff = diff_squared.sum(dim=2)
     assert sum_diff.shape == (3,2)
-
-    # [Distance between sample and center1 , sample and center2] 
+ 
     assert torch.equal(sum_diff, torch.tensor([
         [0,2],
         [2,0],
@@ -137,3 +138,5 @@ def test_gaussian_similarity_with_broadcasting():
         [0.1353, 1.0],
         [0.1353, 0.1353]
     ], dtype=torch.float32))
+
+    
