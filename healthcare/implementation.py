@@ -11,11 +11,6 @@ from abc import ABC, abstractmethod
 
 
 df = pd.read_csv("/Users/n_thurai/workspace/comp_6731/project/healthcare/healthcare_dataset.csv")
-print(df.head())
-
-df.info()
-print(df["Test Results"].unique())
-
 
 
 class DataModel(ABC):
@@ -187,6 +182,7 @@ def plot_training_validation_metrics(loss_val_list, acc_val_list, loss_train_lis
 
 if __name__ == "__main__":
     data_model = HeartDiseaseModel("/Users/n_thurai/workspace/comp_6731/project/healthcare/heart.csv")
+    data_model.df.info()
     neural_net = Neural_Network(input_size = data_model.feature_count, number_of_classes=3, hidden_dim=32)
     optimizer = torch.optim.Adam(neural_net.parameters(), lr = 0.001)
 
