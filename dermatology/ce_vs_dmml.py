@@ -226,6 +226,55 @@ def eval_accuracy_loss_dmml(model, loader, device, loss_fn):
             total += len(X)
     return correct / total, val_losses/ len(loader.dataset)
 
+def visualize_pca_features_dermatology(df, X_tensor):
+    X_np = X_tensor.cpu().numpy()
+
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_np)
+    plt.figure(figsize=(6,6))
+    cmap = plt.get_cmap("tab10")  # tab10 has 10 distinct colors
+    labels = df.iloc[:, -1].astype(int) - 1
+    labels_np = labels.to_numpy()  # ensure numpy array of ints
+    # Scatter each class separately so the legend is correct
+    for class_id in range(6):
+        idx = (labels_np == class_id)
+        plt.scatter(
+            X_pca[idx, 0],
+            X_pca[idx, 1],
+            color=cmap(class_id),
+            alpha=0.7,
+            label=f"Class {class_id}",
+            s=40
+        )
+    plt.title("Raw Input Features (PCA Before Training)")
+    plt.legend()
+    plt.show()
+    return labels_np
+
+def visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels_np, model_name="CE"):
+    with torch.no_grad():
+        _, feats = model_ce(X_tensor, return_features=True)
+
+    feats = feats.cpu().numpy()
+
+    X_vis = TSNE(n_components=2, learning_rate="auto").fit_transform(feats)
+
+    # Scatter each class separately so the legend is correct
+    cmap = plt.get_cmap("tab10")  # tab10 has 10 distinct colors
+    for class_id in range(6):
+        idx = (labels_np == class_id)
+        plt.scatter(
+            X_vis[idx, 0],
+            X_vis[idx, 1],
+            color=cmap(class_id),
+            alpha=0.7,
+            label=f"Class {class_id}",
+            s=40
+        )
+    plt.title(f"t-SNE Embedding of Heart Disease Features ({model_name})")
+    plt.legend()
+    plt.show()
+
 # ============================================================
 # 5. MAIN EXPERIMENT
 # ============================================================
@@ -357,54 +406,7 @@ def main():
     visualize_tsne_embedding_dermatology(model_dmm_g, X_tensor, labels_np, model_name="DMML-G")
     visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels_np, model_name="CE")
 
-def visualize_pca_features_dermatology(df, X_tensor):
-    X_np = X_tensor.cpu().numpy()
 
-    pca = PCA(n_components=2)
-    X_pca = pca.fit_transform(X_np)
-    plt.figure(figsize=(6,6))
-    cmap = plt.get_cmap("tab10")  # tab10 has 10 distinct colors
-    labels = df.iloc[:, -1].astype(int) - 1
-    labels_np = labels.to_numpy()  # ensure numpy array of ints
-    # Scatter each class separately so the legend is correct
-    for class_id in range(6):
-        idx = (labels_np == class_id)
-        plt.scatter(
-            X_pca[idx, 0],
-            X_pca[idx, 1],
-            color=cmap(class_id),
-            alpha=0.7,
-            label=f"Class {class_id}",
-            s=40
-        )
-    plt.title("Raw Input Features (PCA Before Training)")
-    plt.legend()
-    plt.show()
-    return labels_np
-
-def visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels_np, model_name="CE"):
-    with torch.no_grad():
-        _, feats = model_ce(X_tensor, return_features=True)
-
-    feats = feats.cpu().numpy()
-
-    X_vis = TSNE(n_components=2, learning_rate="auto").fit_transform(feats)
-
-    # Scatter each class separately so the legend is correct
-    cmap = plt.get_cmap("tab10")  # tab10 has 10 distinct colors
-    for class_id in range(6):
-        idx = (labels_np == class_id)
-        plt.scatter(
-            X_vis[idx, 0],
-            X_vis[idx, 1],
-            color=cmap(class_id),
-            alpha=0.7,
-            label=f"Class {class_id}",
-            s=40
-        )
-    plt.title(f"t-SNE Embedding of Heart Disease Features ({model_name})")
-    plt.legend()
-    plt.show()
 
 
 if __name__ == "__main__":
