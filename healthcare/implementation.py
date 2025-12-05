@@ -5,7 +5,7 @@ from sklearn.preprocessing import StandardScaler
 import torch.nn.functional as F
 import torch
 from torch import nn
-from torch.utils.data import Dataset, DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod
 
