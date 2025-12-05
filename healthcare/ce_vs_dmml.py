@@ -7,6 +7,8 @@ from sklearn.preprocessing import StandardScaler
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
 
 
 # ============================================================
@@ -36,6 +38,14 @@ def load_heart_disease(path="heart.csv", val_size=0.2):
 
     X = df.drop(columns=['target'])
     y = df['target']
+
+    categorical_cols = ["cp", "restecg", "slope", "ca", "thal"]
+        
+    X_cat = pd.get_dummies(X[categorical_cols].astype(str))
+    X_num = X.drop(columns=categorical_cols)
+
+    X = np.hstack([X_num.values, X_cat.values])
+
     # Train/val split
     X_train, X_val, y_train, y_val = train_test_split(
         X, y, test_size=val_size, random_state=42
@@ -72,63 +82,10 @@ class MLPClassifier(nn.Module):
         return logits
 
 
-# ============================================================
-# 3. LOSS FUNCTIONS
-# ============================================================
-
-def dmml_simplified(features, logits, labels, classifier,
-                    ce_weight=1.0, mm_weight=1.0, var_weight=0.1, margin=1.0):
-    """
-    Simplified DMML:
-      - Margin in distance space between embedding and class centers.
-      - Variance (compactness) penalty.
-    """
-    device = features.device
-    N, D = features.shape
-    num_classes = logits.shape[1]
-
-    ce_loss = nn.functional.cross_entropy(logits, labels)
-
-    # Class centers from classifier weights
-    W = classifier.weight  # [C, D]
-
-    # Compute squared distances: [N, C]
-    diff = features.unsqueeze(1) - W.unsqueeze(0)
-    dist2 = (diff ** 2).sum(dim=2)
-
-    pos = dist2[torch.arange(N, device=device), labels]
-
-    # Mask out positive class
-    mask = torch.zeros_like(dist2, dtype=torch.bool)
-    mask[torch.arange(N), labels] = True
-    neg_dist = dist2.masked_fill(mask, float("inf"))
-
-    neg_min, _ = neg_dist.min(dim=1)
-
-    # Margin: d_neg >= d_pos + margin
-    violation = margin + pos - neg_min
-    mm_loss = torch.relu(violation).mean()
-
-    # Variance term
-    var_loss = 0.0
-    classes_present = 0
-    for c in range(num_classes):
-        group = features[labels == c]
-        if len(group) > 1:
-            mu = group.mean(dim=0, keepdim=True)
-            var_loss += ((group - mu)**2).sum(dim=1).mean()
-            classes_present += 1
-
-    if classes_present > 0:
-        var_loss /= classes_present
-
-    total = ce_weight * ce_loss + mm_weight * mm_loss + var_weight * var_loss
-    return total
-
 
 def dmml_gaussian(features, logits, labels, classifier,
-                  ce_weight=1.0, mm_weight=1.0, var_weight=0.1,
-                  beta=0.2, sigma=1.0):
+                  ce_weight=1.0, mm_weight=1.0, var_weight=0.3,
+                  beta=3, sigma=1):
     """
     DMML using Gaussian similarities.
     """
@@ -293,7 +250,7 @@ def main():
     # OPTIONAL: PLOTTING
     # ====================================================
     try:
-        import matplotlib.pyplot as plt
+        
 
         epochs = range(1, 100)
 
@@ -308,6 +265,50 @@ def main():
         plt.legend(); plt.title("Validation Accuracy"); plt.show()
     except:
         print("Matplotlib not installed; skipping plots.")
+    
+    df = pd.read_csv("/Users/n_thurai/workspace/comp_6731/project/healthcare/heart.csv")
+    X = df.drop(columns=['target'])
+    y = df['target']
+
+    categorical_cols = ["cp", "restecg", "slope", "ca", "thal"]
+        
+    X_cat = pd.get_dummies(X[categorical_cols].astype(str))
+    X_num = X.drop(columns=categorical_cols)
+
+    X = np.hstack([X_num.values, X_cat.values])
+    X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
+    labels = y.values
+    model_dmm_g.eval()
+
+    from sklearn.decomposition import PCA
+
+    # X_tensor is your FULL dataset (train + val + test)
+    X_np = X_tensor.cpu().numpy()
+
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_np)
+
+    plt.figure(figsize=(6,6))
+    plt.scatter(X_pca[:,0], X_pca[:,1], c=labels, cmap="coolwarm", alpha=0.7)
+    plt.title("Raw Input Features (PCA Before Training)")
+    plt.show()    
+
+    visualize_tsne_embedding(model_dmm_g, X_tensor, labels, model_name="DMML-G")
+    visualize_tsne_embedding(model_ce, X_tensor, labels, model_name="CE")
+
+def visualize_tsne_embedding(model_ce, X_tensor, labels, model_name="CE"):
+    with torch.no_grad():
+        _, feats = model_ce(X_tensor, return_features=True)
+
+    feats = feats.cpu().numpy()
+
+    X_vis = TSNE(n_components=2, learning_rate="auto").fit_transform(feats)
+
+    
+
+    plt.scatter(X_vis[:,0], X_vis[:,1], c=labels, cmap="coolwarm")
+    plt.title(f"t-SNE Embedding of Heart Disease Features ({model_name})")
+    plt.show()
 
 
 if __name__ == "__main__":

@@ -46,38 +46,6 @@ class DataModel(ABC):
         self.test_loader = DataLoader(test_ds, batch_size = 64, shuffle = False)
 
 
-class HealthcareModel(DataModel):
-
-    def __init__(self, source):
-        self.df = pd.read_csv(source)
-        self._split_load_data()
-
-    def _pre_process_data(self):
-        # Calculate length of stay before dropping date columns
-        self.df['Date of Admission'] = pd.to_datetime(self.df['Date of Admission'])
-        self.df['Discharge Date'] = pd.to_datetime(self.df['Discharge Date'])
-        self.df['Length of Stay'] = (self.df['Discharge Date'] - self.df['Date of Admission']).dt.days
-        gender_mapping = {'Male': 0, 'Female': 1}
-        self.df['Gender'] = self.df['Gender'].map(gender_mapping)
-
-        # One-hot encode
-        self.df = pd.get_dummies(self.df, columns=['Blood Type'], prefix='BloodType', dtype=int)
-        self.df = pd.get_dummies(self.df, columns=['Medical Condition'], prefix='med_cond', dtype=int)
-        # self.df = pd.get_dummies(self.df, columns=['Insurance Provider'], prefix='insurance', dtype=int)
-        self.df = pd.get_dummies(self.df, columns=['Admission Type'], prefix='admission', dtype=int)
-        self.df = pd.get_dummies(self.df, columns=['Medication'], prefix='med', dtype=int)
-
-        # Drop the columns not being used.
-        self.df = self.df.drop(columns=['Name', 'Doctor', 'Hospital', 'Room Number', 'Date of Admission', 'Discharge Date', 'Insurance Provider'])
-        test_results_mapping = {'Normal': 0, 'Inconclusive': 1, 'Abnormal': 2}
-
-        self.df['Test Results'] = self.df['Test Results'].map(test_results_mapping)
-
-        X = self.df.drop(columns=['Test Results'])
-        y = self.df['Test Results']
-
-        return X , y
-
 
 
 class HeartDiseaseModel(DataModel):
@@ -90,16 +58,23 @@ class HeartDiseaseModel(DataModel):
         X = self.df.drop(columns=['target'])
         y = self.df['target']
 
-        return X , y
+        categorical_cols = ["cp", "restecg", "slope", "ca", "thal"]
+        
+        X_cat = pd.get_dummies(X[categorical_cols].astype(str))
+        X_num = X.drop(columns=categorical_cols)
 
+        X_processed = np.hstack([X_num.values, X_cat.values])
+
+        return X_processed, y
 class Neural_Network(nn.Module):
   def __init__(self, input_size, number_of_classes, hidden_dim = 128):
     super(Neural_Network, self).__init__()
-    self.fc1 = nn.Linear(input_size, 128)
+    self.fc1 = nn.Linear(input_size, hidden_dim)
     self.af1 = nn.ReLU()
-    self.fc2 = nn.Linear(128, hidden_dim)
+    self.fc2 = nn.Linear(hidden_dim, hidden_dim)
     self.af2 = nn.ReLU()
     self.output = nn.Linear(hidden_dim, number_of_classes)
+
 
   def forward(self, x):
     x = self.af1(self.fc1(x))
@@ -140,7 +115,7 @@ def lmv_loss(f, labels, sigma, prototypes):
 
     return L_mv
 
-def lmm_loss(features, labels, prototypes, beta=0.5, sigma=1.0):
+def lmm_loss(features, labels, prototypes, beta=2, sigma=1.0):
     """
     features:   [B, D]
     labels:     [B]
@@ -183,7 +158,7 @@ def plot_training_validation_metrics(loss_val_list, acc_val_list, loss_train_lis
 if __name__ == "__main__":
     data_model = HeartDiseaseModel("/Users/n_thurai/workspace/comp_6731/project/healthcare/heart.csv")
     data_model.df.info()
-    neural_net = Neural_Network(input_size = data_model.feature_count, number_of_classes=3, hidden_dim=32)
+    neural_net = Neural_Network(input_size = data_model.feature_count, number_of_classes=3, hidden_dim=64)
     optimizer = torch.optim.Adam(neural_net.parameters(), lr = 0.001)
 
     epochs = 1000

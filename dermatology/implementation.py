@@ -7,6 +7,8 @@ from sklearn.preprocessing import StandardScaler
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
 
 
 # ============================================================
@@ -84,59 +86,12 @@ class MLPClassifier(nn.Module):
 # 3. LOSS FUNCTIONS
 # ============================================================
 
-def dmml_simplified(features, logits, labels, classifier,
-                    ce_weight=1.0, mm_weight=1.0, var_weight=0.1, margin=1.0):
-    """
-    Simplified DMML:
-      - Margin in distance space between embedding and class centers.
-      - Variance (compactness) penalty.
-    """
-    device = features.device
-    N, D = features.shape
-    num_classes = logits.shape[1]
 
-    ce_loss = nn.functional.cross_entropy(logits, labels)
-
-    # Class centers from classifier weights
-    W = classifier.weight  # [C, D]
-
-    # Compute squared distances: [N, C]
-    diff = features.unsqueeze(1) - W.unsqueeze(0)
-    dist2 = (diff ** 2).sum(dim=2)
-
-    pos = dist2[torch.arange(N, device=device), labels]
-
-    # Mask out positive class
-    mask = torch.zeros_like(dist2, dtype=torch.bool)
-    mask[torch.arange(N), labels] = True
-    neg_dist = dist2.masked_fill(mask, float("inf"))
-
-    neg_min, _ = neg_dist.min(dim=1)
-
-    # Margin: d_neg >= d_pos + margin
-    violation = margin + pos - neg_min
-    mm_loss = torch.relu(violation).mean()
-
-    # Variance term
-    var_loss = 0.0
-    classes_present = 0
-    for c in range(num_classes):
-        group = features[labels == c]
-        if len(group) > 1:
-            mu = group.mean(dim=0, keepdim=True)
-            var_loss += ((group - mu)**2).sum(dim=1).mean()
-            classes_present += 1
-
-    if classes_present > 0:
-        var_loss /= classes_present
-
-    total = ce_weight * ce_loss + mm_weight * mm_loss + var_weight * var_loss
-    return total
 
 
 def dmml_gaussian(features, logits, labels, classifier,
                   ce_weight=1.0, mm_weight=1.0, var_weight=0.1,
-                  beta=0.2, sigma=1.0):
+                  beta=1.5, sigma=1.0):
     """
     DMML using Gaussian similarities.
     """
@@ -240,6 +195,40 @@ def eval_accuracy(model, loader, device):
     return correct / total
 
 
+def eval_accuracy_loss_ce(model, loader, device):
+    model.eval()
+    val_losses = 0
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for X, y in loader:
+            X, y = X.to(device), y.to(device)
+            output_val = model(X)
+            preds = output_val.argmax(dim=1)
+            ce_loss_val = nn.functional.cross_entropy(output_val, y)
+            val_losses += ce_loss_val.item() * X.size(0)
+            correct += (preds == y).sum().item()
+            total += len(X)
+    return correct / total, val_losses/ len(loader.dataset)
+
+
+def eval_accuracy_loss_dmml(model, loader, device, loss_fn):
+    model.eval()
+    val_losses = 0
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for X, y in loader:
+            X, y = X.to(device), y.to(device)
+            output_val = model(X)
+            preds = output_val.argmax(dim=1)
+            logits, feats = model(X, return_features=True)
+            dmml_loss_val = loss_fn(feats, logits, y, model.classifier)
+            val_losses += dmml_loss_val.item() * X.size(0)
+            correct += (preds == y).sum().item()
+            total += len(X)
+    return correct / total, val_losses/ len(loader.dataset)
+
 # ============================================================
 # 5. MAIN EXPERIMENT
 # ============================================================
@@ -262,7 +251,6 @@ def main():
 
     # Lists for plotting
     ce_train, ce_acc = [], []
-    dmm_s_train, dmm_s_acc = [], []
     dmm_g_train, dmm_g_acc = [], []
 
     # ====================================================
@@ -272,30 +260,32 @@ def main():
     model_ce = MLPClassifier(input_dim, hidden_dim=64, num_classes=num_classes).to(device)
     opt_ce = torch.optim.Adam(model_ce.parameters(), lr=1e-3)
 
-    for epoch in range(1, 31):
+    best_val_loss = float('inf')
+    best_val_acc = 0
+    patience = 10
+    patience_counter = 0
+    for epoch in range(1, 100):
         tl = train_epoch_ce(model_ce, train_loader, opt_ce, device)
-        acc = eval_accuracy(model_ce, val_loader, device)
+        acc, loss = eval_accuracy_loss_ce(model_ce, val_loader, device)
 
         ce_train.append(tl)
         ce_acc.append(acc)
+        if loss < best_val_loss:
+            best_val_loss = loss
+            best_val_acc = acc
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f'The best validation loss: {best_val_loss:.4f}, the best validation accuracy: {best_val_acc:.4f}')
+                print('Early Stopping!')
+                break
 
         print(f"[CE] Epoch {epoch:02d}  Loss={tl:.4f}  Acc={acc:.4f}")
 
-    # ====================================================
-    # 2. DMML - SIMPLIFIED
-    # ====================================================
-    print("\nTraining DMML (simplified)...")
-    model_dmm_s = MLPClassifier(input_dim, hidden_dim=64, num_classes=num_classes).to(device)
-    opt_dmm_s = torch.optim.Adam(model_dmm_s.parameters(), lr=1e-3)
 
-    for epoch in range(1, 31):
-        tl = train_epoch_dmml(model_dmm_s, train_loader, opt_dmm_s, device, loss_fn=dmml_simplified)
-        acc = eval_accuracy(model_dmm_s, val_loader, device)
 
-        dmm_s_train.append(tl)
-        dmm_s_acc.append(acc)
 
-        print(f"[DMML-S] Epoch {epoch:02d}  Loss={tl:.4f}  Acc={acc:.4f}")
 
     # ====================================================
     # 3. DMML - GAUSSIAN
@@ -304,36 +294,121 @@ def main():
     model_dmm_g = MLPClassifier(input_dim, hidden_dim=64, num_classes=num_classes).to(device)
     opt_dmm_g = torch.optim.Adam(model_dmm_g.parameters(), lr=1e-3)
 
-    for epoch in range(1, 31):
+
+    best_val_loss = float('inf')
+    best_val_acc = 0
+    patience = 5
+    patience_counter = 0
+
+    for epoch in range(1, 100):
         tl = train_epoch_dmml(model_dmm_g, train_loader, opt_dmm_g, device, loss_fn=dmml_gaussian)
-        acc = eval_accuracy(model_dmm_g, val_loader, device)
+        acc, loss = eval_accuracy_loss_dmml(model_dmm_g, val_loader, device, loss_fn=dmml_gaussian)
 
         dmm_g_train.append(tl)
         dmm_g_acc.append(acc)
+        if loss < best_val_loss:
+            best_val_loss = loss
+            best_val_acc = acc
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f'The best validation loss: {best_val_loss:.4f}, the best validation accuracy: {best_val_acc:.4f}')
+                print('Early Stopping!')
+                break
 
         print(f"[DMML-G] Epoch {epoch:02d}  Loss={tl:.4f}  Acc={acc:.4f}")
 
     # ====================================================
     # OPTIONAL: PLOTTING
     # ====================================================
-    try:
-        import matplotlib.pyplot as plt
 
-        epochs = range(1, 31)
+        
 
-        plt.figure(figsize=(12,5))
-        plt.plot(epochs, ce_train, label="CE Loss")
-        plt.plot(epochs, dmm_s_train, label="DMML-S Loss")
-        plt.plot(epochs, dmm_g_train, label="DMML-G Loss")
-        plt.legend(); plt.title("Training Loss"); plt.show()
+    epochs = range(1, 100)
 
-        plt.figure(figsize=(12,5))
-        plt.plot(epochs, ce_acc, label="CE Acc")
-        plt.plot(epochs, dmm_s_acc, label="DMML-S Acc")
-        plt.plot(epochs, dmm_g_acc, label="DMML-G Acc")
-        plt.legend(); plt.title("Validation Accuracy"); plt.show()
-    except:
-        print("Matplotlib not installed; skipping plots.")
+    plt.figure(figsize=(12,5))
+    plt.plot(ce_acc, label="CE Acc")
+    plt.legend(); plt.title("Validation Accuracy"); plt.show()
+
+
+    plt.figure(figsize=(12,5))
+    plt.plot(dmm_g_acc, label="DMML-G Acc")
+    plt.legend(); plt.title("Validation Accuracy"); plt.show()
+
+
+
+
+    df = pd.read_csv("dermatology.csv")
+
+    # Replace '?' with NaN
+    df = df.replace("?", np.nan).astype(float)
+
+    # Fill missing values with column medians
+    df = df.fillna(df.median())
+
+    # The last column is the class label (1–6)
+    X = df.iloc[:, :-1].values           # all other columns are features
+    X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
+
+
+    from sklearn.decomposition import PCA
+
+    # X_tensor is your FULL dataset (train + val + test)
+    X_np = X_tensor.cpu().numpy()
+
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_np)
+    plt.figure(figsize=(6,6))
+    # plt.scatter(X_pca[:,0], X_pca[:,1], c=labels, cmap="coolwarm", alpha=0.7)
+    cmap = plt.get_cmap("tab10")  # tab10 has 10 distinct colors
+    labels = df.iloc[:, -1].astype(int) - 1
+    labels_np = labels.to_numpy()  # ensure numpy array of ints
+# Scatter each class separately so the legend is correct
+    for class_id in range(6):
+        idx = (labels_np == class_id)
+        plt.scatter(
+            X_pca[idx, 0],
+            X_pca[idx, 1],
+            color=cmap(class_id),
+            alpha=0.7,
+            label=f"Class {class_id}",
+            s=40
+        )
+    plt.title("Raw Input Features (PCA Before Training)")
+    plt.legend()
+    plt.show()    
+
+
+
+
+
+    visualize_tsne_embedding(model_dmm_g, X_tensor, labels_np, model_name="DMML-G")
+    visualize_tsne_embedding(model_ce, X_tensor, labels_np, model_name="CE")
+
+def visualize_tsne_embedding(model_ce, X_tensor, labels_np, model_name="CE"):
+    with torch.no_grad():
+        _, feats = model_ce(X_tensor, return_features=True)
+
+    feats = feats.cpu().numpy()
+
+    X_vis = TSNE(n_components=2, learning_rate="auto").fit_transform(feats)
+
+    # Scatter each class separately so the legend is correct
+    cmap = plt.get_cmap("tab10")  # tab10 has 10 distinct colors
+    for class_id in range(6):
+        idx = (labels_np == class_id)
+        plt.scatter(
+            X_vis[idx, 0],
+            X_vis[idx, 1],
+            color=cmap(class_id),
+            alpha=0.7,
+            label=f"Class {class_id}",
+            s=40
+        )
+    plt.title(f"t-SNE Embedding of Heart Disease Features ({model_name})")
+    plt.legend()
+    plt.show()
 
 
 if __name__ == "__main__":

@@ -20,6 +20,16 @@
       "cwd": "${workspaceFolder}/dermatology",
       "python": "/Users/n_thurai/.pyenv/versions/project_titanic/bin/python",
       "args": []
+    },
+{
+      "name": "Python: Launch Healthcare (implementation.py)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/healthcare/implementation.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/healthcare",
+      "python": "/Users/n_thurai/.pyenv/versions/project_titanic/bin/python",
+      "args": []
     }
   ]
 }
