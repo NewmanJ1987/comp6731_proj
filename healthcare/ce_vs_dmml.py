@@ -11,6 +11,8 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
+from training_utilitites import train_epoch_ce, train_epoch_dmml, eval_accuracy_loss_ce, eval_accuracy_loss_dmml
+
 
 
 # ============================================================
@@ -90,7 +92,6 @@ def dmml_gaussian(features, logits, labels, classifier,
     """
     DMML using Gaussian similarities.
     """
-    device = features.device
     N, D = features.shape
     num_classes = logits.shape[1]
 
@@ -134,96 +135,6 @@ def dmml_gaussian(features, logits, labels, classifier,
 
 
 # ============================================================
-# 4. TRAINING UTILITIES
-# ============================================================
-
-def train_epoch_ce(model, loader, opt, device):
-    model.train()
-    total_loss = 0
-    total = 0
-
-    for X, y in loader:
-        X, y = X.to(device), y.to(device)
-
-        opt.zero_grad()
-        logits = model(X)
-        loss = nn.functional.cross_entropy(logits, y)
-        loss.backward()
-        opt.step()
-
-        total_loss += loss.item() * len(X)
-        total += len(X)
-
-    return total_loss / total
-
-
-def train_epoch_dmml(model, loader, opt, device, loss_fn):
-    model.train()
-    total_loss = 0
-    total = 0
-
-    for X, y in loader:
-        X, y = X.to(device), y.to(device)
-
-        opt.zero_grad()
-        logits, feats = model(X, return_features=True)
-        loss = loss_fn(feats, logits, y, model.classifier)
-        loss.backward()
-        opt.step()
-
-        total_loss += loss.item() * len(X)
-        total += len(X)
-
-    return total_loss / total
-
-
-def eval_accuracy(model, loader, device):
-    model.eval()
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for X, y in loader:
-            X, y = X.to(device), y.to(device)
-            preds = model(X).argmax(dim=1)
-            correct += (preds == y).sum().item()
-            total += len(X)
-    return correct / total
-
-def eval_accuracy_loss_ce(model, loader, device):
-    model.eval()
-    val_losses = 0
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for X, y in loader:
-            X, y = X.to(device), y.to(device)
-            output_val = model(X)
-            preds = output_val.argmax(dim=1)
-            ce_loss_val = nn.functional.cross_entropy(output_val, y)
-            val_losses += ce_loss_val.item() * X.size(0)
-            correct += (preds == y).sum().item()
-            total += len(X)
-    return correct / total, val_losses/ len(loader.dataset)
-
-def eval_accuracy_loss_dmml(model, loader, device, loss_fn):
-    model.eval()
-    val_losses = 0
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for X, y in loader:
-            X, y = X.to(device), y.to(device)
-            output_val = model(X)
-            preds = output_val.argmax(dim=1)
-            logits, feats = model(X, return_features=True)
-            dmml_loss_val = loss_fn(feats, logits, y, model.classifier)
-            val_losses += dmml_loss_val.item() * X.size(0)
-            correct += (preds == y).sum().item()
-            total += len(X)
-    return correct / total, val_losses/ len(loader.dataset)
-
-
-# ============================================================
 # 5. MAIN EXPERIMENT
 # ============================================================
 
@@ -243,7 +154,9 @@ def main():
 
     print("Using device:", device)
 
-    # Lists for plotting
+    # Lists for plotting: 
+    # ce_train stores CE training loss per epoch, ce_acc stores CE validation accuracy per epoch
+    # dmm_g_train stores DMML-G training loss per epoch, dmm_g_acc stores DMML-G validation accuracy per epoch
     ce_train, ce_acc = [], []
     dmm_g_train, dmm_g_acc = [], []
 
@@ -277,6 +190,7 @@ def main():
 
         print(f"[CE] Epoch {epoch:02d}  Loss={tl:.4f}  Acc={acc:.4f}")
 
+            
 
     # ====================================================
     # 3. DMML - GAUSSIAN
