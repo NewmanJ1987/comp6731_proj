@@ -92,24 +92,16 @@ class MLPClassifier(nn.Module):
 
 
 # ============================================================
-# 3. LOSS FUNCTIONS
-# ============================================================
-
-
-
-# ============================================================
 # 4. VISUALIZATION UTILITIES
 # ============================================================
 
-def visualize_pca_features_dermatology(df, X_tensor):
+def visualize_pca_features_dermatology(X_tensor, labels_np):
     X_np = X_tensor.cpu().numpy()
 
     pca = PCA(n_components=2)
     X_pca = pca.fit_transform(X_np)
     plt.figure(figsize=(6,6))
     cmap = plt.get_cmap("tab10")  # tab10 has 10 distinct colors
-    labels = df.iloc[:, -1].astype(int) - 1
-    labels_np = labels.to_numpy()  # ensure numpy array of ints
     # Scatter each class separately so the legend is correct
     for class_id in range(6):
         idx = (labels_np == class_id)
@@ -124,7 +116,6 @@ def visualize_pca_features_dermatology(df, X_tensor):
     plt.title("Raw Input Features (PCA Before Training)")
     plt.legend()
     plt.show()
-    return labels_np
 
 def visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels_np, model_name="CE"):
     with torch.no_grad():
@@ -240,9 +231,7 @@ def main():
 
         print(f"[DMML-G] Epoch {epoch:02d}  Loss={tl:.4f}  Acc={acc:.4f}")
 
-    # ====================================================
-    # OPTIONAL: PLOTTING
-    # ====================================================
+
 
         
     plt.figure(figsize=(12,5))
@@ -260,26 +249,16 @@ def main():
 
 
 
+    X, y =preprocess_dermatology_data("/Users/n_thurai/workspace/comp_6731/project/dermatology/dermatology.csv")
 
-    df = pd.read_csv("/Users/n_thurai/workspace/comp_6731/project/dermatology/dermatology.csv")
 
-    # Replace '?' with NaN
-    df = df.replace("?", np.nan).astype(float)
-
-    # Fill missing values with column medians
-    df = df.fillna(df.median())
-
-    # The last column is the class label (1–6)
-    X = df.iloc[:, :-1].values           # all other columns are features
     X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
+    labels = y.values
 
-
-    
-
-    # Create plots and visualize results. 
-    labels_np = visualize_pca_features_dermatology(df, X_tensor)    
-    visualize_tsne_embedding_dermatology(model_dmm_g, X_tensor, labels_np, model_name="DMML-G")
-    visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels_np, model_name="CE")
+    # Create plots and visualize results.
+    visualize_pca_features_dermatology(X_tensor, labels)
+    visualize_tsne_embedding_dermatology(model_dmm_g, X_tensor, labels, model_name="DMML-G")
+    visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels, model_name="CE")
 
 
 
