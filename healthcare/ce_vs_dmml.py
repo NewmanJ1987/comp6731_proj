@@ -11,7 +11,8 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
-from training_utilitites import train_epoch_ce, train_epoch_dmml, eval_accuracy_loss_ce, eval_accuracy_loss_dmml
+from training_utilitites import train_epoch_ce, train_epoch_dmml, eval_accuracy_loss_ce, eval_accuracy_loss_dmml, dmml_gaussian
+from  functools import partial
 
 
 
@@ -85,55 +86,6 @@ class MLPClassifier(nn.Module):
         return logits
 
 
-
-def dmml_gaussian(features, logits, labels, classifier,
-                  ce_weight=1.0, mm_weight=1.0, var_weight=0.3,
-                  beta=2, sigma=1):
-    """
-    DMML using Gaussian similarities.
-    """
-    N, D = features.shape
-    num_classes = logits.shape[1]
-
-    ce_loss = nn.functional.cross_entropy(logits, labels)
-
-    W = classifier.weight  # [C, D]
-
-    # Squared distances and Gaussian similarity
-    diff = features.unsqueeze(1) - W.unsqueeze(0)
-    dist2 = (diff ** 2).sum(dim=2)
-    sim = torch.exp(-dist2 / (2 * sigma**2))
-
-    s_pos = sim[torch.arange(N), labels]
-
-    # Mask out the positive class
-    mask = torch.zeros_like(sim, dtype=torch.bool)
-    mask[torch.arange(N), labels] = True
-    neg_sim = sim.masked_fill(mask, float("-inf"))
-
-    s_neg, _ = neg_sim.max(dim=1)
-
-    # Margin in similarity space: s_pos >= s_neg + beta
-    violation = beta + s_neg - s_pos
-    mm_loss = (torch.relu(violation)**2).mean()
-
-    # Variance term
-    var_loss = 0.0
-    classes_present = 0
-    for c in range(num_classes):
-        group = features[labels == c]
-        if len(group) > 1:
-            mu = group.mean(dim=0, keepdim=True)
-            var_loss += ((group - mu)**2).sum(dim=1).mean()
-            classes_present += 1
-
-    if classes_present > 0:
-        var_loss /= classes_present
-
-    total = ce_weight * ce_loss + mm_weight * mm_loss + var_weight * var_loss
-    return total
-
-
 # ============================================================
 # 5. MAIN EXPERIMENT
 # ============================================================
@@ -205,8 +157,9 @@ def main():
     patience_counter = 0
 
     for epoch in range(1, 100):
-        tl = train_epoch_dmml(model_dmm_g, train_loader, opt_dmm_g, device, loss_fn=dmml_gaussian)
-        acc, loss = eval_accuracy_loss_dmml(model_dmm_g, val_loader, device, loss_fn=dmml_gaussian)
+        partial_dmml_gaussian = partial(dmml_gaussian, ce_weight=1.0, mm_weight=1.0, var_weight=0.3, beta=3, sigma=1)
+        tl = train_epoch_dmml(model_dmm_g, train_loader, opt_dmm_g, device, loss_fn=partial_dmml_gaussian)
+        acc, loss = eval_accuracy_loss_dmml(model_dmm_g, val_loader, device, loss_fn=partial_dmml_gaussian)
 
         dmm_g_train.append(tl)
         dmm_g_acc.append(acc)

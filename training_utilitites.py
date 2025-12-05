@@ -85,3 +85,51 @@ def eval_accuracy_loss_dmml(model, loader, device, loss_fn):
             correct += (preds == y).sum().item()
             total += len(X)
     return correct / total, val_losses/ len(loader.dataset)
+
+
+def dmml_gaussian(features, logits, labels, classifier,
+                  ce_weight=1.0, mm_weight=1.0, var_weight=0.1,
+                  beta=1.5, sigma=1.0):
+    """
+    DMML using Gaussian similarities.
+    """
+    N, _ = features.shape
+    num_classes = logits.shape[1]
+
+    ce_loss = nn.functional.cross_entropy(logits, labels)
+
+    W = classifier.weight  # [C, D]
+
+    # Squared distances and Gaussian similarity
+    diff = features.unsqueeze(1) - W.unsqueeze(0)
+    dist2 = (diff ** 2).sum(dim=2)
+    sim = torch.exp(-dist2 / (2 * sigma**2))
+
+    s_pos = sim[torch.arange(N), labels]
+
+    # Mask out the positive class
+    mask = torch.zeros_like(sim, dtype=torch.bool)
+    mask[torch.arange(N), labels] = True
+    neg_sim = sim.masked_fill(mask, float("-inf"))
+
+    s_neg, _ = neg_sim.max(dim=1)
+
+    # Margin in similarity space: s_pos >= s_neg + beta
+    violation = beta + s_neg - s_pos
+    mm_loss = (torch.relu(violation)**2).mean()
+
+    # Variance term
+    var_loss = 0.0
+    classes_present = 0
+    for c in range(num_classes):
+        group = features[labels == c]
+        if len(group) > 1:
+            mu = group.mean(dim=0, keepdim=True)
+            var_loss += ((group - mu)**2).sum(dim=1).mean()
+            classes_present += 1
+
+    if classes_present > 0:
+        var_loss /= classes_present
+
+    total = ce_weight * ce_loss + mm_weight * mm_loss + var_weight * var_loss
+    return total
