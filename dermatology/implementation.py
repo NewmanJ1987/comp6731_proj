@@ -9,6 +9,7 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 
 
 # ============================================================
@@ -85,10 +86,6 @@ class MLPClassifier(nn.Module):
 # ============================================================
 # 3. LOSS FUNCTIONS
 # ============================================================
-
-
-
-
 def dmml_gaussian(features, logits, labels, classifier,
                   ce_weight=1.0, mm_weight=1.0, var_weight=0.1,
                   beta=1.5, sigma=1.0):
@@ -324,17 +321,18 @@ def main():
     # ====================================================
 
         
-
-    epochs = range(1, 100)
-
     plt.figure(figsize=(12,5))
     plt.plot(ce_acc, label="CE Acc")
-    plt.legend(); plt.title("Validation Accuracy"); plt.show()
+    plt.legend() 
+    plt.title("Validation Accuracy")
+    plt.show()
 
 
     plt.figure(figsize=(12,5))
     plt.plot(dmm_g_acc, label="DMML-G Acc")
-    plt.legend(); plt.title("Validation Accuracy"); plt.show()
+    plt.legend()
+    plt.title("Validation Accuracy")
+    plt.show()
 
 
 
@@ -352,19 +350,23 @@ def main():
     X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
 
 
-    from sklearn.decomposition import PCA
+    
 
-    # X_tensor is your FULL dataset (train + val + test)
+    # Create plots and visualize results. 
+    labels_np = visualize_pca_features_dermatology(df, X_tensor)    
+    visualize_tsne_embedding_dermatology(model_dmm_g, X_tensor, labels_np, model_name="DMML-G")
+    visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels_np, model_name="CE")
+
+def visualize_pca_features_dermatology(df, X_tensor):
     X_np = X_tensor.cpu().numpy()
 
     pca = PCA(n_components=2)
     X_pca = pca.fit_transform(X_np)
     plt.figure(figsize=(6,6))
-    # plt.scatter(X_pca[:,0], X_pca[:,1], c=labels, cmap="coolwarm", alpha=0.7)
     cmap = plt.get_cmap("tab10")  # tab10 has 10 distinct colors
     labels = df.iloc[:, -1].astype(int) - 1
     labels_np = labels.to_numpy()  # ensure numpy array of ints
-# Scatter each class separately so the legend is correct
+    # Scatter each class separately so the legend is correct
     for class_id in range(6):
         idx = (labels_np == class_id)
         plt.scatter(
@@ -377,16 +379,10 @@ def main():
         )
     plt.title("Raw Input Features (PCA Before Training)")
     plt.legend()
-    plt.show()    
+    plt.show()
+    return labels_np
 
-
-
-
-
-    visualize_tsne_embedding(model_dmm_g, X_tensor, labels_np, model_name="DMML-G")
-    visualize_tsne_embedding(model_ce, X_tensor, labels_np, model_name="CE")
-
-def visualize_tsne_embedding(model_ce, X_tensor, labels_np, model_name="CE"):
+def visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels_np, model_name="CE"):
     with torch.no_grad():
         _, feats = model_ce(X_tensor, return_features=True)
 

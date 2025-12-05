@@ -9,10 +9,12 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
 
 
 # ============================================================
-# 1. DATASET LOADING (DERMATOLOGY)
+# 1. DATASET LOADING 
 # ============================================================
 
 class HeartDiseaseDataset(Dataset):
@@ -27,14 +29,8 @@ class HeartDiseaseDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 
-def load_heart_disease(path="heart.csv", val_size=0.2):
-    """
-    Loads the dermatology dataset from Kaggle.
-    Expects last column to be the class label (1–6).
-    Some versions of the dataset may have missing values encoded as '?'.
-    """
-
-    df = pd.read_csv(path)
+def preprocess_heart_data(csv_path):
+    df = pd.read_csv(csv_path)
 
     X = df.drop(columns=['target'])
     y = df['target']
@@ -46,6 +42,11 @@ def load_heart_disease(path="heart.csv", val_size=0.2):
 
     X = np.hstack([X_num.values, X_cat.values])
 
+    return X, y
+
+
+def load_heart_disease(path="heart.csv", val_size=0.2):
+    X, y = preprocess_heart_data(path)
     # Train/val split
     X_train, X_val, y_train, y_val = train_test_split(
         X, y, test_size=val_size, random_state=42
@@ -249,40 +250,30 @@ def main():
     # ====================================================
     # OPTIONAL: PLOTTING
     # ====================================================
-    try:
-        
-
-        epochs = range(1, 100)
-
-        plt.figure(figsize=(12,5))
-        plt.plot(epochs, ce_train, label="CE Loss")
-        plt.plot(epochs, dmm_g_train, label="DMML-G Loss")
-        plt.legend(); plt.title("Training Loss"); plt.show()
-
-        plt.figure(figsize=(12,5))
-        plt.plot(epochs, ce_acc, label="CE Acc")
-        plt.plot(epochs, dmm_g_acc, label="DMML-G Acc")
-        plt.legend(); plt.title("Validation Accuracy"); plt.show()
-    except:
-        print("Matplotlib not installed; skipping plots.")
     
-    df = pd.read_csv("/Users/n_thurai/workspace/comp_6731/project/healthcare/heart.csv")
-    X = df.drop(columns=['target'])
-    y = df['target']
+    visualize_accuracy(ce_acc, label="CE Acc")
+    visualize_accuracy(dmm_g_acc, label="DMML-G Acc")
 
-    categorical_cols = ["cp", "restecg", "slope", "ca", "thal"]
-        
-    X_cat = pd.get_dummies(X[categorical_cols].astype(str))
-    X_num = X.drop(columns=categorical_cols)
 
-    X = np.hstack([X_num.values, X_cat.values])
+    X, y = preprocess_heart_data("/Users/n_thurai/workspace/comp_6731/project/healthcare/heart.csv")
     X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
     labels = y.values
-    model_dmm_g.eval()
 
-    from sklearn.decomposition import PCA
 
     # X_tensor is your FULL dataset (train + val + test)
+    visualize_pca_features_heart_disease(X_tensor, labels)    
+
+    visualize_tsne_embedding_heart_disease(model_dmm_g, X_tensor, labels, model_name="DMML-G")
+    visualize_tsne_embedding_heart_disease(model_ce, X_tensor, labels, model_name="CE")
+
+def visualize_accuracy(acc_list, label="CE Acc"):
+    plt.figure(figsize=(12,5))
+    plt.plot(acc_list, label=label)
+    plt.legend()
+    plt.title("Validation Accuracy")
+    plt.show()
+
+def visualize_pca_features_heart_disease(X_tensor, labels):
     X_np = X_tensor.cpu().numpy()
 
     pca = PCA(n_components=2)
@@ -291,12 +282,9 @@ def main():
     plt.figure(figsize=(6,6))
     plt.scatter(X_pca[:,0], X_pca[:,1], c=labels, cmap="coolwarm", alpha=0.7)
     plt.title("Raw Input Features (PCA Before Training)")
-    plt.show()    
+    plt.show()
 
-    visualize_tsne_embedding(model_dmm_g, X_tensor, labels, model_name="DMML-G")
-    visualize_tsne_embedding(model_ce, X_tensor, labels, model_name="CE")
-
-def visualize_tsne_embedding(model_ce, X_tensor, labels, model_name="CE"):
+def visualize_tsne_embedding_heart_disease(model_ce, X_tensor, labels, model_name="CE"):
     with torch.no_grad():
         _, feats = model_ce(X_tensor, return_features=True)
 
