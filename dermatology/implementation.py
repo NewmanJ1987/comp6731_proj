@@ -49,7 +49,7 @@ def load_dermatology(path="dermatology.csv", val_size=0.2):
 
     # Train/val split
     X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=val_size, random_state=42, stratify=y
+        X, y, test_size=val_size, random_state=42
     )
 
     # Standardize features

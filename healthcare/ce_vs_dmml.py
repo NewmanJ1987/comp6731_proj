@@ -31,7 +31,7 @@ class HeartDiseaseDataset(Dataset):
 
 def preprocess_heart_data(csv_path):
     df = pd.read_csv(csv_path)
-
+    df = df.drop_duplicates()
     X = df.drop(columns=['target'])
     y = df['target']
 
@@ -65,7 +65,7 @@ def load_heart_disease(path="heart.csv", val_size=0.2):
 # ============================================================
 
 class MLPClassifier(nn.Module):
-    def __init__(self, input_dim, hidden_dim=32, num_classes=6):
+    def __init__(self, input_dim, hidden_dim=64, num_classes=6):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
@@ -86,7 +86,7 @@ class MLPClassifier(nn.Module):
 
 def dmml_gaussian(features, logits, labels, classifier,
                   ce_weight=1.0, mm_weight=1.0, var_weight=0.3,
-                  beta=3, sigma=1):
+                  beta=2, sigma=1):
     """
     DMML using Gaussian similarities.
     """
@@ -189,6 +189,39 @@ def eval_accuracy(model, loader, device):
             total += len(X)
     return correct / total
 
+def eval_accuracy_loss_ce(model, loader, device):
+    model.eval()
+    val_losses = 0
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for X, y in loader:
+            X, y = X.to(device), y.to(device)
+            output_val = model(X)
+            preds = output_val.argmax(dim=1)
+            ce_loss_val = nn.functional.cross_entropy(output_val, y)
+            val_losses += ce_loss_val.item() * X.size(0)
+            correct += (preds == y).sum().item()
+            total += len(X)
+    return correct / total, val_losses/ len(loader.dataset)
+
+def eval_accuracy_loss_dmml(model, loader, device, loss_fn):
+    model.eval()
+    val_losses = 0
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for X, y in loader:
+            X, y = X.to(device), y.to(device)
+            output_val = model(X)
+            preds = output_val.argmax(dim=1)
+            logits, feats = model(X, return_features=True)
+            dmml_loss_val = loss_fn(feats, logits, y, model.classifier)
+            val_losses += dmml_loss_val.item() * X.size(0)
+            correct += (preds == y).sum().item()
+            total += len(X)
+    return correct / total, val_losses/ len(loader.dataset)
+
 
 # ============================================================
 # 5. MAIN EXPERIMENT
@@ -218,15 +251,29 @@ def main():
     # 1. CROSS ENTROPY
     # ====================================================
     print("\nTraining CE...")
-    model_ce = MLPClassifier(input_dim, hidden_dim=32, num_classes=num_classes).to(device)
+    model_ce = MLPClassifier(input_dim, hidden_dim=64, num_classes=num_classes).to(device)
     opt_ce = torch.optim.Adam(model_ce.parameters(), lr=1e-3)
 
+    best_val_loss = float('inf')
+    best_val_acc = 0
+    patience = 5
+    patience_counter = 0
     for epoch in range(1, 100):
         tl = train_epoch_ce(model_ce, train_loader, opt_ce, device)
-        acc = eval_accuracy(model_ce, val_loader, device)
+        acc, loss = eval_accuracy_loss_ce(model_ce, val_loader, device)
 
         ce_train.append(tl)
         ce_acc.append(acc)
+        if loss < best_val_loss:
+            best_val_loss = loss
+            best_val_acc = acc
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f'The best validation loss: {best_val_loss:.4f}, the best validation accuracy: {best_val_acc:.4f}')
+                print('Early Stopping!')
+                break
 
         print(f"[CE] Epoch {epoch:02d}  Loss={tl:.4f}  Acc={acc:.4f}")
 
@@ -235,21 +282,33 @@ def main():
     # 3. DMML - GAUSSIAN
     # ====================================================
     print("\nTraining DMML (Gaussian)...")
-    model_dmm_g = MLPClassifier(input_dim, hidden_dim=32, num_classes=num_classes).to(device)
+    model_dmm_g = MLPClassifier(input_dim, hidden_dim=64, num_classes=num_classes).to(device)
     opt_dmm_g = torch.optim.Adam(model_dmm_g.parameters(), lr=1e-3)
+
+    best_val_loss = float('inf')
+    best_val_acc = 0
+    patience = 5
+    patience_counter = 0
 
     for epoch in range(1, 100):
         tl = train_epoch_dmml(model_dmm_g, train_loader, opt_dmm_g, device, loss_fn=dmml_gaussian)
-        acc = eval_accuracy(model_dmm_g, val_loader, device)
+        acc, loss = eval_accuracy_loss_dmml(model_dmm_g, val_loader, device, loss_fn=dmml_gaussian)
 
         dmm_g_train.append(tl)
         dmm_g_acc.append(acc)
+        if loss < best_val_loss:
+            best_val_loss = loss
+            best_val_acc = acc
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f'The best validation loss: {best_val_loss:.4f}, the best validation accuracy: {best_val_acc:.4f}')
+                print('Early Stopping!')
+                break
 
         print(f"[DMML-G] Epoch {epoch:02d}  Loss={tl:.4f}  Acc={acc:.4f}")
 
-    # ====================================================
-    # OPTIONAL: PLOTTING
-    # ====================================================
     
     visualize_accuracy(ce_acc, label="CE Acc")
     visualize_accuracy(dmm_g_acc, label="DMML-G Acc")
