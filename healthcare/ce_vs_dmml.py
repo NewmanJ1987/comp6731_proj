@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import os
+from dotenv import load_dotenv
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -12,7 +14,10 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
 from training_utilitites import train_epoch_ce, train_epoch_dmml, eval_accuracy_loss_ce, eval_accuracy_loss_dmml, dmml_gaussian
-from  functools import partial
+from functools import partial
+
+# Load environment variables from .env file
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 
 
@@ -127,7 +132,12 @@ def visualize_tsne_embedding_heart_disease(model_ce, X_tensor, labels, model_nam
 # ============================================================
 
 def main():
-    X_train, X_val, y_train, y_val = load_heart_disease("/Users/n_thurai/workspace/comp_6731/project/healthcare/heart.csv")
+    # Load dataset path from environment variable
+    heart_csv_path = os.getenv('HEART_DATASET_CSV')
+    if not heart_csv_path:
+        raise ValueError("HEART_DATASET_CSV environment variable not set in .env file")
+    
+    X_train, X_val, y_train, y_val = load_heart_disease(heart_csv_path)
 
     train_ds = HeartDiseaseDataset(X_train, y_train)
     val_ds   = HeartDiseaseDataset(X_val, y_val)
@@ -217,7 +227,7 @@ def main():
     visualize_accuracy(dmm_g_acc, label="DMML-G Acc")
 
 
-    X, y = preprocess_heart_data("/Users/n_thurai/workspace/comp_6731/project/healthcare/heart.csv")
+    X, y = preprocess_heart_data(heart_csv_path)
     X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
     labels = y.values
 

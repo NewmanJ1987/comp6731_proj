@@ -5,19 +5,20 @@ This project compares the performance of Cross-Entropy (CE) loss with Dense Max-
 ## Project Structure
 
 ```
-project/
+.
+├── __init__.py
+├── dermatology
+│   ├── ce_vs_dmml.py            # Dermatology ce vs dmml comparison
+│   ├── dermatology.csv          # Dermatology datasets
+│   └── trial.ipynb              # Script measuring accuracy of dermatology
+├── healthcare
+│   ├── __init__.py
+│   ├── ce_vs_dmml.py           # Healthcare ce vs dmml comparison
+│   ├── heart.csv               # Heart disease datasets 
+│   └── implementation.py       # Script measuring accuracy of healthcare
 ├── README.md
-├── requirements.txt
-├── training_utilitites.py          # Shared training utilities
-├── dermatology/
-│   ├── ce_vs_dmml.py               # Dermatology main experiment
-│   ├── dermatology.csv             # Dataset
-│   └── trial.ipynb                 # Jupyter notebook for exploration
-└── healthcare/
-    ├── ce_vs_dmml.py               # Healthcare main experiment
-    ├── implementation.py            # Shared implementation
-    ├── heart.csv                   # Heart disease dataset
-    └── healthcare_dataset.csv      # Alternative healthcare dataset
+├── requirements.txt            # The dependencies for this project
+└── training_utilitites.py      # Shared training utilities
 ```
 
 ## Installation & Setup
@@ -26,13 +27,13 @@ project/
 
 ```bash
 # Navigate to project directory
-cd /Users/n_thurai/workspace/comp_6731/project
+cd ~/workspace/comp_6731/project
 
 # Create virtual environment (if not already created)
-python3 -m venv project_titanic
+python3 -m venv env_project
 
 # Activate virtual environment
-source project_titanic/bin/activate
+source env_project/bin/activate
 ```
 
 ### 2. Install Dependencies
@@ -42,12 +43,6 @@ source project_titanic/bin/activate
 pip install -r requirements.txt
 ```
 
-Or individually:
-```bash
-pip install torch torch-vision torchaudio
-pip install scikit-learn pandas numpy matplotlib seaborn
-pip install pytest
-```
 
 ## Running the Experiments
 
@@ -57,15 +52,15 @@ From the project root directory:
 
 ```bash
 # Activate virtual environment first
-source project_titanic/bin/activate
+source env_project/bin/activate
 
 # Run dermatology CE vs DMML comparison
-cd dermatology
-python ce_vs_dmml.py
+
+python -m dermatology.ce_vs_dmml
 ```
 
 **Output:**
-- Console logs showing training progress (CE, DMML-Simplified, DMML-Gaussian)
+- Console logs showing training progress (CE, DMML-Gaussian)
 - Training loss plot
 - Validation accuracy plot
 - PCA visualization of raw features
@@ -77,11 +72,10 @@ From the project root directory:
 
 ```bash
 # Activate virtual environment first
-source project_titanic/bin/activate
+source env_project/bin/activate
 
 # Run healthcare CE vs DMML comparison
-cd healthcare
-python ce_vs_dmml.py
+python healthcare.ce_vs_dmml
 ```
 
 **Output:**
@@ -90,26 +84,12 @@ python ce_vs_dmml.py
 - t-SNE embeddings visualization
 - Performance metrics comparison
 
-### Run Both Experiments
 
-```bash
-source project_titanic/bin/activate
-
-# Dermatology
-cd dermatology && python ce_vs_dmml.py
-cd ..
-
-# Healthcare
-cd healthcare && python ce_vs_dmml.py
-cd ..
-```
 
 ## Key Features
-
 ### Loss Functions Compared
 
 1. **Cross-Entropy (CE)**: Standard classification loss
-2. **DMML-Simplified**: Margin-based loss in distance space
 3. **DMML-Gaussian**: Margin-based loss using Gaussian similarities
 
 ### Dataset Details
@@ -137,14 +117,14 @@ Input Features → Linear(input_dim, 64) → ReLU → Linear(64, 64) → ReLU �
 ### Training Parameters
 
 - **Optimizer**: Adam (learning rate 1e-3)
-- **Epochs**: 30
+- **Epochs**: 100 (with early stoppage.)
 - **Batch Size**: 32 (training), 128 (validation)
-- **Train/Val Split**: 80/20 with stratification
+- **Train/Val Split**: 80/20 
 
 ### DMML Hyperparameters
 
 - **Margin**: 1.0 (distance margin)
-- **Beta**: 0.2 (similarity margin, Gaussian variant)
+- **Beta**: 2.0 (similarity margin, Gaussian variant)
 - **Sigma**: 1.0 (Gaussian bandwidth)
 - **Weights**: ce_weight=1.0, mm_weight=1.0, var_weight=0.1
 
@@ -159,33 +139,6 @@ Using device: cuda
 Using device: cpu
 ```
 
-### Paths
-
-The scripts assume they run from their respective dataset directories:
-
-```bash
-cd dermatology
-python ce_vs_dmml.py  # Looks for dermatology.csv in current directory
-```
-
-If you prefer to run from project root, modify the dataset path in `ce_vs_dmml.py`:
-```python
-# Instead of:
-X_train, X_val, y_train, y_val = load_dermatology("dermatology.csv")
-
-# Use:
-X_train, X_val, y_train, y_val = load_dermatology("dermatology/dermatology.csv")
-```
-
-### Dependencies & Versions
-
-See `requirements.txt` for exact package versions. Key dependencies:
-- **PyTorch**: 2.2.0 (deep learning framework)
-- **scikit-learn**: 1.7.2 (machine learning utilities)
-- **pandas**: 2.2.1 (data manipulation)
-- **matplotlib**: 3.8.3 (visualization)
-- **numpy**: 1.26.4 (numerical computing)
-
 ## Troubleshooting
 
 ### Issue: Module not found errors
@@ -196,12 +149,6 @@ import sys
 sys.path.append('../')  # Add parent directory to path
 ```
 
-### Issue: "Matplotlib not installed; skipping plots"
-
-**Solution**: Install matplotlib:
-```bash
-pip install matplotlib
-```
 
 ### Issue: CUDA out of memory
 
@@ -233,7 +180,7 @@ python ce_vs_dmml.py
 
 ### Visualizations
 
-1. **Training Loss Curve**: Compares convergence speed of three methods
+1. **Training Loss Curve**: Compares convergence speed of the two methods
 2. **Validation Accuracy Curve**: Shows final performance
 3. **PCA Plot**: 2D projection of raw input features colored by class
 4. **t-SNE Embedding**: 2D projection of learned representations, shows cluster separation
@@ -242,7 +189,7 @@ Better separated clusters in t-SNE indicate stronger learned representations.
 
 ## Virtual Environment Info
 
-The `project_titanic` environment uses Python 3.x with the following key packages:
+The `env_project` environment uses Python 3.x with the following key packages:
 
 ```
 torch==2.2.0

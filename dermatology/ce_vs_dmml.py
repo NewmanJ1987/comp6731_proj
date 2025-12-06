@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import os
+from dotenv import load_dotenv
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -12,6 +14,9 @@ from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 
 from training_utilitites import train_epoch_ce, train_epoch_dmml, eval_accuracy_loss_ce, eval_accuracy_loss_dmml, dmml_gaussian
+
+# Load environment variables from .env file
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 
 
@@ -152,7 +157,12 @@ def visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels_np, model_na
 # ============================================================
 
 def main():
-    X_train, X_val, y_train, y_val = load_dermatology("/Users/n_thurai/workspace/comp_6731/project/dermatology/dermatology.csv")
+    # Load dataset path from environment variable
+    dermatology_csv_path = os.getenv('DERMATOLOGY_DATASET_CSV')
+    if not dermatology_csv_path:
+        raise ValueError("DERMATOLOGY_DATASET_CSV environment variable not set in .env file")
+    
+    X_train, X_val, y_train, y_val = load_dermatology(dermatology_csv_path)
 
     train_ds = DermatologyDataset(X_train, y_train)
     val_ds   = DermatologyDataset(X_val, y_val)
@@ -241,7 +251,7 @@ def main():
 
 
 
-    X, y =preprocess_dermatology_data("/Users/n_thurai/workspace/comp_6731/project/dermatology/dermatology.csv")
+    X, y =preprocess_dermatology_data(dermatology_csv_path)
     X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
     labels = y.values
 
