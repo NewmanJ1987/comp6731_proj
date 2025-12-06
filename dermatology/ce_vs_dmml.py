@@ -92,8 +92,14 @@ class MLPClassifier(nn.Module):
 
 
 # ============================================================
-# 4. VISUALIZATION UTILITIES
+# 3. VISUALIZATION UTILITIES
 # ============================================================
+def visualize_accuracy(acc_list, label="CE Acc"):
+    plt.figure(figsize=(12,5))
+    plt.plot(acc_list, label=label)
+    plt.legend()
+    plt.title("Validation Accuracy")
+    plt.show()
 
 def visualize_pca_features_dermatology(X_tensor, labels_np):
     X_np = X_tensor.cpu().numpy()
@@ -137,12 +143,12 @@ def visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels_np, model_na
             label=f"Class {class_id}",
             s=40
         )
-    plt.title(f"t-SNE Embedding of Heart Disease Features ({model_name})")
+    plt.title(f"t-SNE Embedding of Dermatology Features ({model_name})")
     plt.legend()
     plt.show()
 
 # ============================================================
-# 5. MAIN EXPERIMENT
+# 4. MAIN EXPERIMENT
 # ============================================================
 
 def main():
@@ -197,8 +203,6 @@ def main():
 
 
 
-
-
     # ====================================================
     # 3. DMML - GAUSSIAN
     # ====================================================
@@ -232,34 +236,18 @@ def main():
         print(f"[DMML-G] Epoch {epoch:02d}  Loss={tl:.4f}  Acc={acc:.4f}")
 
 
-
-        
-    plt.figure(figsize=(12,5))
-    plt.plot(ce_acc, label="CE Acc")
-    plt.legend() 
-    plt.title("Validation Accuracy")
-    plt.show()
-
-
-    plt.figure(figsize=(12,5))
-    plt.plot(dmm_g_acc, label="DMML-G Acc")
-    plt.legend()
-    plt.title("Validation Accuracy")
-    plt.show()
+    visualize_accuracy(ce_acc, label="CE Acc")
+    visualize_accuracy(dmm_g_acc, label="DMML-G Acc")
 
 
 
     X, y =preprocess_dermatology_data("/Users/n_thurai/workspace/comp_6731/project/dermatology/dermatology.csv")
-
-
     X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
     labels = y.values
 
-    # Create plots and visualize results.
     visualize_pca_features_dermatology(X_tensor, labels)
     visualize_tsne_embedding_dermatology(model_dmm_g, X_tensor, labels, model_name="DMML-G")
     visualize_tsne_embedding_dermatology(model_ce, X_tensor, labels, model_name="CE")
-
 
 
 

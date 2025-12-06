@@ -85,9 +85,45 @@ class MLPClassifier(nn.Module):
             return logits, feats
         return logits
 
+# ============================================================
+# 3. VISUALIZATION UTILITIES
+# ============================================================
+
+def visualize_accuracy(acc_list, label="CE Acc"):
+    plt.figure(figsize=(12,5))
+    plt.plot(acc_list, label=label)
+    plt.legend()
+    plt.title("Validation Accuracy")
+    plt.show()
+
+def visualize_pca_features_heart_disease(X_tensor, labels):
+    X_np = X_tensor.cpu().numpy()
+
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_np)
+
+    plt.figure(figsize=(6,6))
+    plt.scatter(X_pca[:,0], X_pca[:,1], c=labels, cmap="coolwarm", alpha=0.7)
+    plt.title("Raw Input Features (PCA Before Training)")
+    plt.show()
+
+def visualize_tsne_embedding_heart_disease(model_ce, X_tensor, labels, model_name="CE"):
+    with torch.no_grad():
+        _, feats = model_ce(X_tensor, return_features=True)
+
+    feats = feats.cpu().numpy()
+
+    X_vis = TSNE(n_components=2, learning_rate="auto").fit_transform(feats)
+
+    
+
+    plt.scatter(X_vis[:,0], X_vis[:,1], c=labels, cmap="coolwarm")
+    plt.title(f"t-SNE Embedding of Heart Disease Features ({model_name})")
+    plt.show()
+
 
 # ============================================================
-# 5. MAIN EXPERIMENT
+# 4. MAIN EXPERIMENT
 # ============================================================
 
 def main():
@@ -186,43 +222,11 @@ def main():
     labels = y.values
 
 
-    # X_tensor is your FULL dataset (train + val + test)
     visualize_pca_features_heart_disease(X_tensor, labels)    
-
     visualize_tsne_embedding_heart_disease(model_dmm_g, X_tensor, labels, model_name="DMML-G")
     visualize_tsne_embedding_heart_disease(model_ce, X_tensor, labels, model_name="CE")
 
-def visualize_accuracy(acc_list, label="CE Acc"):
-    plt.figure(figsize=(12,5))
-    plt.plot(acc_list, label=label)
-    plt.legend()
-    plt.title("Validation Accuracy")
-    plt.show()
 
-def visualize_pca_features_heart_disease(X_tensor, labels):
-    X_np = X_tensor.cpu().numpy()
-
-    pca = PCA(n_components=2)
-    X_pca = pca.fit_transform(X_np)
-
-    plt.figure(figsize=(6,6))
-    plt.scatter(X_pca[:,0], X_pca[:,1], c=labels, cmap="coolwarm", alpha=0.7)
-    plt.title("Raw Input Features (PCA Before Training)")
-    plt.show()
-
-def visualize_tsne_embedding_heart_disease(model_ce, X_tensor, labels, model_name="CE"):
-    with torch.no_grad():
-        _, feats = model_ce(X_tensor, return_features=True)
-
-    feats = feats.cpu().numpy()
-
-    X_vis = TSNE(n_components=2, learning_rate="auto").fit_transform(feats)
-
-    
-
-    plt.scatter(X_vis[:,0], X_vis[:,1], c=labels, cmap="coolwarm")
-    plt.title(f"t-SNE Embedding of Heart Disease Features ({model_name})")
-    plt.show()
 
 
 if __name__ == "__main__":
