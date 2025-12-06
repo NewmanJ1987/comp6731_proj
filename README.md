@@ -43,6 +43,59 @@ source env_project/bin/activate
 pip install -r requirements.txt
 ```
 
+### 3. Configure Environment Variables
+
+The project uses a `.env` file to store dataset paths. This makes the code portable and allows you to run experiments from any location without modifying the source code.
+
+#### Understanding the `.env` File
+
+A `.env` file is a simple text file that stores environment variable key-value pairs. The project includes a `.env.example` file at the root directory with the following structure:
+
+```bash
+# Dataset paths
+HEART_DATASET_CSV=/path/to/heart.csv
+DERMATOLOGY_DATASET_CSV=/path/to/dermatology.csv
+```
+
+#### How to Configure `.env`
+
+
+1. **If the `.env` file doesn't exist:**
+   - Create it manually:
+     ```bash
+     cp .env.example to .env
+     ```
+   - Update the template with paths to match your system:
+     ```bash
+     # Dataset paths
+     HEART_DATASET_CSV=/path/to/your/heart.csv
+     DERMATOLOGY_DATASET_CSV=/path/to/your/dermatology.csv
+     ```
+
+
+#### Example `.env` File Configurations
+
+**macOS/Linux Example:**
+```bash
+HEART_DATASET_CSV=/home/user/workspace/comp_6731/project/healthcare/heart.csv
+DERMATOLOGY_DATASET_CSV=/home/user/workspace/comp_6731/project/dermatology/dermatology.csv
+```
+
+**Windows Example:**
+```bash
+HEART_DATASET_CSV=C:\Users\user\workspace\comp_6731\project\healthcare\heart.csv
+DERMATOLOGY_DATASET_CSV=C:\Users\user\workspace\comp_6731\project\dermatology\dermatology.csv
+```
+
+#### Verifying Your Configuration
+
+After setting up the `.env` file, you can verify the paths are correct:
+
+```bash
+# Check if files exist at the specified paths
+ls -la $(grep HEART_DATASET_CSV .env | cut -d= -f2)
+ls -la $(grep DERMATOLOGY_DATASET_CSV .env | cut -d= -f2)
+```
 
 ## Running the Experiments
 
@@ -139,31 +192,6 @@ Using device: cuda
 Using device: cpu
 ```
 
-## Troubleshooting
-
-### Issue: Module not found errors
-
-**Solution**: Ensure you're running from the correct directory or modify import paths:
-```python
-import sys
-sys.path.append('../')  # Add parent directory to path
-```
-
-
-### Issue: CUDA out of memory
-
-**Solution**: Reduce batch size in the code or disable GPU:
-```python
-device = torch.device("cpu")  # Force CPU
-```
-
-### Issue: CSV file not found
-
-**Solution**: Ensure you're running from the correct directory:
-```bash
-cd dermatology  # Must be in this directory
-python ce_vs_dmml.py
-```
 
 ## Output Interpretation
 
