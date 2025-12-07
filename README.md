@@ -63,7 +63,7 @@ DERMATOLOGY_DATASET_CSV=/path/to/dermatology.csv
 1. **If the `.env` file doesn't exist:**
    - Create it manually:
      ```bash
-     cp .env.example to .env
+     cp .env.example .env
      ```
    - Update the template with paths to match your system:
      ```bash
@@ -85,16 +85,6 @@ DERMATOLOGY_DATASET_CSV=/home/user/workspace/comp_6731/project/dermatology/derma
 ```bash
 HEART_DATASET_CSV=C:\Users\user\workspace\comp_6731\project\healthcare\heart.csv
 DERMATOLOGY_DATASET_CSV=C:\Users\user\workspace\comp_6731\project\dermatology\dermatology.csv
-```
-
-#### Verifying Your Configuration
-
-After setting up the `.env` file, you can verify the paths are correct:
-
-```bash
-# Check if files exist at the specified paths
-ls -la $(grep HEART_DATASET_CSV .env | cut -d= -f2)
-ls -la $(grep DERMATOLOGY_DATASET_CSV .env | cut -d= -f2)
 ```
 
 ## Running the Experiments
