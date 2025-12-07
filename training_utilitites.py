@@ -103,7 +103,7 @@ def dmml_gaussian(features, logits, labels, classifier,
     # Squared distances and Gaussian similarity
     diff = features.unsqueeze(1) - W.unsqueeze(0)
     dist2 = (diff ** 2).sum(dim=2)
-    sim = torch.exp(-dist2 / (sigma**2))
+    sim = torch.exp(-dist2 / sigma)
 
     s_pos = sim[torch.arange(N), labels]
 
