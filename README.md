@@ -128,7 +128,6 @@ python healthcare.ce_vs_dmml
 - Performance metrics comparison
 
 
-
 ## Key Features
 ### Loss Functions Compared
 
